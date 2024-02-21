@@ -7,9 +7,10 @@ from networkx.algorithms.bipartite import (
 )
 import auct
 import matplotlib.pyplot as plt
+
 # import dlib
 from tqdm import tqdm
-from datetime import  datetime
+from datetime import datetime
 
 SAVE = True
 N = 128  # Drivers
@@ -17,6 +18,12 @@ M = N * 2  # Passengers
 GRID = 0, 1024
 EXPERIMENTS_NUM = 500
 STD_SCALE = np.linspace(0, GRID[1] / 10, num=10)
+
+
+def unif(loc: float = 0.0, scale: float = 1.0, size=None) -> float:
+    # std = sqrt([low - high] ** 2 / 12) -> |low - high| / 2 = std * sqrt(3)
+    relative_boundary = scale * np.sqrt(3)
+    return np.random.uniform(loc - relative_boundary, loc + relative_boundary, size)
 
 
 def polar_to_cartesian(r, theta):
@@ -77,11 +84,17 @@ def naive_assignment_random(biadjecancy_matrix: np.array, minimize=True):
         not_taken = np.setdiff1d(
             np.arange(biadjecancy_matrix.shape[1]), assignments, True
         )
-        assignments_partition = not_taken[np.argpartition(biadjecancy_matrix[obj][not_taken], min(K - 1, len(not_taken) - 1))[:K]]
+        assignments_partition = not_taken[
+            np.argpartition(
+                biadjecancy_matrix[obj][not_taken], min(K - 1, len(not_taken) - 1)
+            )[:K]
+        ]
         weights = biadjecancy_matrix[obj][assignments_partition]
         weights = 1 / weights
         # weights = np.max(weights) * 1.5 - np.array(weights)
-        assignment = np.random.choice(assignments_partition, 1, p=(np.exp(weights) / np.sum(np.exp(weights))))[0]
+        assignment = np.random.choice(
+            assignments_partition, 1, p=(np.exp(weights) / np.sum(np.exp(weights)))
+        )[0]
         assignments[obj] = assignment
 
     if switch_assign:
@@ -94,15 +107,20 @@ def naive_assignment_random(biadjecancy_matrix: np.array, minimize=True):
 
 
 def visualize_matching(passenger_loc, drivers_loc, matching, title=None):
-    plt.plot(passenger_loc[:, 0], passenger_loc[:, 1], 'o', color='red', label='passengers')
-    plt.plot(drivers_loc[:, 0], drivers_loc[:, 1], 'o', color='blue', label='passengers')
+    plt.plot(
+        passenger_loc[:, 0], passenger_loc[:, 1], "o", color="red", label="passengers"
+    )
+    plt.plot(
+        drivers_loc[:, 0], drivers_loc[:, 1], "o", color="blue", label="passengers"
+    )
     for p, d in matching:
         locs = np.vstack([passenger_loc[p], drivers_loc[d]])
-        plt.plot(locs[:, 0], locs[:, 1], color='black')
+        plt.plot(locs[:, 0], locs[:, 1], color="black")
     if title:
         plt.title(title)
     plt.legend()
     plt.show()
+
 
 def experiment_M_N():
     np.random.seed(0)
@@ -123,13 +141,12 @@ def experiment_M_N():
         apx_errors_naive_random = list()
         apx_errors_auction = list()
         for experiment in range(EXPERIMENTS_NUM):
-            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(*GRID, (M, 2))
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
             distances = cdist(drivers, passengers)
 
-
-            matching_array_hungarian = get_matching_from_biadjecncy_matrix(
-                distances
-            )
+            matching_array_hungarian = get_matching_from_biadjecncy_matrix(distances)
             matching_array_naive = naive_assignment(distances)
             # matching_array_naive_random = naive_assignment_random(distances)
 
@@ -142,9 +159,7 @@ def experiment_M_N():
                 tuple(np.transpose(matching_array_hungarian))
             ].sum()
 
-            dist_naive = distances[
-                tuple(np.transpose(matching_array_naive))
-            ].sum()
+            dist_naive = distances[tuple(np.transpose(matching_array_naive))].sum()
             apx_errors_naive.append(
                 np.abs(dist_hungarian - dist_naive) / dist_hungarian
             )
@@ -188,7 +203,9 @@ def experiment_M_N():
     plt.title(f"Approximation error of solution as a function of Passengers ")
     plt.grid()
     if SAVE:
-        filename = 'plots/plot' + datetime.today().strftime('%Y_%m_%d_%H_%M_%S') + '.png'
+        filename = (
+            "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
+        )
         plt.savefig(filename)
     plt.show()
 
@@ -210,17 +227,18 @@ def main():
         apx_errors_naive_random = list()
         apx_errors_auction = list()
         for experiment in range(EXPERIMENTS_NUM):
-            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(*GRID, (M, 2))
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
             distances = cdist(drivers, passengers)
-
 
             noise = np.random.normal(0, std, M), np.random.uniform(0, np.pi, M)
             fake_passengers = passengers + polar_to_cartesian(*noise)
             noise_matrix = np.random.normal(0, std, (N, M))
             # noise_distances = cdist(drivers, fake_passengers)
-            noise_distances = np.maximum(GRID[1] / 100, cdist(drivers, passengers) + noise_matrix)
-
-
+            noise_distances = np.maximum(
+                GRID[1] / 100, cdist(drivers, passengers) + noise_matrix
+            )
 
             matching_array_without_noise = get_matching_from_biadjecncy_matrix(
                 distances
@@ -228,9 +246,13 @@ def main():
             matching_array_without_noise_naive = naive_assignment(distances)
 
             # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
-            matching_array_with_noise = get_matching_from_biadjecncy_matrix(noise_distances)
+            matching_array_with_noise = get_matching_from_biadjecncy_matrix(
+                noise_distances
+            )
             matching_array_with_noise_naive = naive_assignment(noise_distances)
-            matching_array_with_noise_naive_random = naive_assignment_random(noise_distances)
+            matching_array_with_noise_naive_random = naive_assignment_random(
+                noise_distances
+            )
 
             # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
             # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
@@ -246,7 +268,7 @@ def main():
             apx_errors.append(
                 np.abs(dist_without_noise - dist_with_noise) / dist_without_noise
             )
-            
+
             dist_with_noise_naive = distances[
                 tuple(np.transpose(matching_array_with_noise_naive))
             ].sum()
@@ -258,7 +280,8 @@ def main():
                 tuple(np.transpose(matching_array_with_noise_naive_random))
             ].sum()
             apx_errors_naive_random.append(
-                np.abs(dist_without_noise - dist_with_noise_naive_random) / dist_without_noise
+                np.abs(dist_without_noise - dist_with_noise_naive_random)
+                / dist_without_noise
             )
 
             # dist_with_noise_auction = distances[
@@ -270,7 +293,7 @@ def main():
 
         apx_errors_avg.append(np.average(apx_errors))
         apx_errors_std.append(np.std(apx_errors))
-        
+
         apx_errors_avg_naive.append(np.average(apx_errors_naive))
         apx_errors_std_naive.append(np.std(apx_errors_naive))
 
@@ -281,14 +304,23 @@ def main():
         # apx_errors_std_auction.append(np.std(apx_errors_auction))
 
     plt.errorbar(
-        STD_SCALE / GRID[1], apx_errors_avg, yerr=apx_errors_std, label="hungarian on noise"
+        STD_SCALE / GRID[1],
+        apx_errors_avg,
+        yerr=apx_errors_std,
+        label="hungarian on noise",
     )
     plt.errorbar(
-        STD_SCALE / GRID[1], apx_errors_avg_naive, yerr=apx_errors_std_naive, label="naive on noise"
+        STD_SCALE / GRID[1],
+        apx_errors_avg_naive,
+        yerr=apx_errors_std_naive,
+        label="naive on noise",
     )
 
     plt.errorbar(
-        STD_SCALE / GRID[1], apx_errors_avg_naive_random, yerr=apx_errors_std_naive_random, label="naive random on noise"
+        STD_SCALE / GRID[1],
+        apx_errors_avg_naive_random,
+        yerr=apx_errors_std_naive_random,
+        label="naive random on noise",
     )
     # plt.errorbar(
     #     STD_SCALE, apx_errors_avg_auction, yerr=apx_errors_std_auction, label="auction"
@@ -296,13 +328,16 @@ def main():
     plt.xlabel("Std of noise divided by grid length")
     plt.ylabel("Approximation error of solution on noised problem")
     plt.legend()
-    plt.title(f"Approximation error of solution on noised problem - Noised Distances\n N={N}, M={M}")
+    plt.title(
+        f"Approximation error of solution on noised problem - Noised Distances\n N={N}, M={M}"
+    )
     plt.grid()
     if SAVE:
-        filename = 'plots/plot'+ datetime.today().strftime('%Y_%m_%d_%H_%M_%S') +'.png'
+        filename = (
+            "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
+        )
         plt.savefig(filename)
     plt.show()
-
 
 
 if __name__ == "__main__":
