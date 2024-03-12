@@ -16,7 +16,7 @@ SAVE = True
 N = 128  # Drivers
 M = N * 2  # Passengers
 GRID = 0, 1024
-EXPERIMENTS_NUM = 500
+EXPERIMENTS_NUM = 50
 STD_SCALE = np.linspace(0, GRID[1] / 10, num=10)
 
 
@@ -97,6 +97,44 @@ def naive_assignment_random(biadjecancy_matrix: np.array, minimize=True):
         )[0]
         assignments[obj] = assignment
 
+    if switch_assign:
+        assignments[:, 0], assignments[:, 1] = (
+            assignments[:, 1],
+            assignments[:, 0].copy(),
+        )
+
+    return np.array(list(enumerate(assignments)))
+
+
+def naive_las_vegas(biadjecancy_matrix: np.array, minimize=True, K=5, max_iter=500):
+    switch_assign = False
+    if biadjecancy_matrix.shape[0] > biadjecancy_matrix.shape[1]:
+        biadjecancy_matrix = biadjecancy_matrix.transpose()
+        switch_assign = True
+
+    assignments = np.full(biadjecancy_matrix.shape[0], -1, int)
+    indexes = list(range(biadjecancy_matrix.shape[0]))
+    np.random.shuffle(indexes)
+    not_taken = np.arange(biadjecancy_matrix.shape[1])
+    not_assigned = np.arange(biadjecancy_matrix.shape[0])
+    i = 0
+    while i < max_iter and not_assigned.size > 0:
+        curr_matrix = biadjecancy_matrix[not_assigned, :][:, not_taken]
+        best_k_each_driver = np.argpartition(curr_matrix, min(K - 1, curr_matrix.shape[1] - 1), axis=1)[:, :K]
+        assignment_ind = np.random.randint(0, min(K, curr_matrix.shape[1]), curr_matrix.shape[0])
+        assignment = best_k_each_driver[np.arange(curr_matrix.shape[0]), assignment_ind]
+        vals, counts = np.unique(assignment, return_counts=True)
+        unique_vals = vals[counts == 1]
+        # taken = not_taken[vals[counts == 1]]
+        not_conflict = np.isin(assignment, unique_vals)
+        took = not_assigned[not_conflict]
+        taken = not_taken[assignment[not_conflict]]
+        assignments[took] = taken
+        not_taken = not_taken[assignment[~ not_conflict]]
+        not_assigned = not_assigned[~ not_conflict]
+        i += 1
+    if i >= max_iter:
+        raise RuntimeError("Failed to match")
     if switch_assign:
         assignments[:, 0], assignments[:, 1] = (
             assignments[:, 1],
@@ -252,10 +290,10 @@ def main():
             noise = np.random.normal(0, std, M), np.random.uniform(0, np.pi, M)
             fake_passengers = passengers + polar_to_cartesian(*noise)
             noise_matrix = np.random.normal(0, std, (N, M))
-            # noise_distances = cdist(drivers, fake_passengers)
-            noise_distances = np.maximum(
-                GRID[1] / 100, cdist(drivers, passengers) + noise_matrix
-            )
+            noise_distances = cdist(drivers, fake_passengers)
+            # noise_distances = np.maximum(
+            #     GRID[1] / 100, cdist(drivers, passengers) + noise_matrix
+            # )
 
             matching_array_without_noise = get_matching_from_biadjecncy_matrix(
                 distances
@@ -267,9 +305,11 @@ def main():
                 noise_distances
             )
             matching_array_with_noise_naive = naive_assignment(noise_distances)
-            matching_array_with_noise_naive_random = naive_assignment_random(
-                noise_distances
-            )
+            # matching_array_with_noise_naive_random = naive_assignment_random(
+            #     noise_distances
+            # )
+            matching_array_with_noise_naive_random = naive_las_vegas(noise_distances, K=3)
+            # test = naive_las_vegas(distances)
 
             # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
             # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
@@ -346,7 +386,7 @@ def main():
     plt.ylabel("Approximation error of solution on noised problem")
     plt.legend()
     plt.title(
-        f"Approximation error of solution on noised problem - Noised Distances\n N={N}, M={M}"
+        f"Approximation error of solution on noised problem - Noised Passengers\n N={N}, M={M}"
     )
     plt.grid()
     if SAVE:
@@ -358,5 +398,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    experiment_M_N()
+    main()
+    # experiment_M_N()
