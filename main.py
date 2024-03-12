@@ -209,6 +209,23 @@ def experiment_M_N():
         plt.savefig(filename)
     plt.show()
 
+def calculate_min_distance():
+    M = 5
+    min_dist = []
+    N_range = np.arange(1500, 25000, 5000)
+    for N in tqdm(N_range):
+        curr_min_distance = []
+        for i in range(EXPERIMENTS_NUM):
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
+            distances = cdist(drivers, passengers)
+            # print(distances.min(axis=0).shape)
+            curr_min_distance.append(distances.min(axis=0).mean() / GRID[1])
+        min_dist.append(np.mean(curr_min_distance))
+    plt.plot(N_range, min_dist)
+    plt.grid()
+    plt.show()
 
 def main():
     np.random.seed(0)
