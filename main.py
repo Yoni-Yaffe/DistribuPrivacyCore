@@ -14,10 +14,11 @@ from datetime import datetime
 
 SAVE = True
 N = 128  # Drivers
-M = N * 2  # Passengers
+M = N     # Passengers
 GRID = 0, 1024
 EXPERIMENTS_NUM = 50
 STD_SCALE = np.linspace(0, GRID[1] / 10, num=10)
+RADIUS_SCALE = np.linspace(0, GRID[1] / 10, num=10)
 
 
 def unif(loc: float = 0.0, scale: float = 1.0, size=None) -> float:
@@ -250,10 +251,11 @@ def experiment_M_N():
 def calculate_min_distance():
     M = 5
     min_dist = []
-    N_range = np.arange(1500, 25000, 5000)
+    N_range = np.linspace(10, 2500, 100).astype(int)
     for N in tqdm(N_range):
         curr_min_distance = []
         for i in range(EXPERIMENTS_NUM):
+            # print(GRID)
             drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
                 *GRID, (M, 2)
             )
@@ -264,6 +266,227 @@ def calculate_min_distance():
     plt.plot(N_range, min_dist)
     plt.grid()
     plt.show()
+def average_distance_calculation():
+    np.random.seed(0)
+    grid_size = np.arange(10, 10000, 100)
+    avg_dist = []
+    for size in tqdm(grid_size):
+        curr = 0
+
+        for i in range(EXPERIMENTS_NUM):
+            # print(size, )
+
+            drivers = np.random.uniform(0, size, (N, 2))
+            passengers = np.random.uniform(
+                0, size, (M, 2)
+            )
+            distances = cdist(drivers, passengers)
+            curr += distances.mean()
+        avg_dist.append(curr / (EXPERIMENTS_NUM * size))
+    plt.plot(grid_size, avg_dist)
+    plt.show()
+
+def entropy_graph():
+    np.random.seed(1)
+
+    apx_errors_avg_hungarian_ball = list()
+    apx_errors_std_hungarian_ball = list()
+
+    apx_errors_avg_naive_ball = list()
+    apx_errors_std_naive_ball = list()
+
+    apx_errors_avg_naive_ring = list()
+    apx_errors_std_naive_ring = list()
+
+    apx_errors_avg_las_vegas_ring = list()
+    apx_errors_std_las_vegas_ring = list()
+    entropy_d = GRID[1] / 2
+    for rad in tqdm(RADIUS_SCALE):
+        # std_distance = std ** 2 * (12 ** 0.5) / entropy_d
+        rad_distances = rad / 7
+        apx_errors_naive_ball = list()
+        apx_errors_naive_ring = list()
+        apx_errors_las_vegas_ring = list()
+        apx_errors_hungarian_ball = list()
+        for experiment in range(EXPERIMENTS_NUM):
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
+            distances = cdist(drivers, passengers)
+
+            noise = np.sqrt(np.random.uniform(0, rad ** 2, M)), np.random.uniform(0, 2 * np.pi, M)
+            fake_passengers = passengers + polar_to_cartesian(*noise)
+
+            # noise_matrix = unif(0, std_distance, (N, M))
+            noise_matrix = np.random.uniform(-rad_distances / 2, rad_distances / 2, (N, M))
+
+            noise_distances_ball = cdist(drivers, fake_passengers)
+            noise_distances_ring = np.maximum(
+                GRID[1] / 10000, cdist(drivers, passengers) + noise_matrix
+            )
+            #
+            matching_array_without_noise = get_matching_from_biadjecncy_matrix(
+                distances
+            )
+
+            matching_array_with_noise = get_matching_from_biadjecncy_matrix(
+                noise_distances_ball
+            )
+            # matching_array_without_noise_naive = naive_assignment(distances)
+
+            # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
+            # matching_array_with_noise = get_matching_from_biadjecncy_matrix(
+            #     noise_distances
+            # )
+            matching_array_with_noise_naive_ball = naive_assignment(noise_distances_ball)
+            matching_array_with_noise_naive_ring = naive_assignment(noise_distances_ring)
+
+            # matching_array_with_noise_naive_random = naive_assignment_random(
+            #     noise_distances
+            # )
+
+            matching_array_with_noise_las_vegas = naive_las_vegas(noise_distances_ring, K=3)
+
+            # test = naive_las_vegas(distances)
+
+            # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
+            # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
+            # exit(1)
+
+            dist_without_noise = distances[
+                tuple(np.transpose(matching_array_without_noise))
+            ].sum()
+
+            dist_with_noise_hungarian = distances[
+                tuple(np.transpose(matching_array_with_noise))
+            ].sum()
+            apx_errors_hungarian_ball.append(
+                np.abs(dist_without_noise - dist_with_noise_hungarian) / dist_without_noise
+            )
+            # apx_errors_without_noise.append(dist_without_noise)
+            # dist_with_noise = distances[
+            #     tuple(np.transpose(matching_array_with_noise))
+            # ].sum()
+            # apx_errors.append(
+            #     np.abs(dist_without_noise - dist_with_noise) / dist_without_noise
+            # )
+
+            dist_with_noise_naive_ball = distances[
+                tuple(np.transpose(matching_array_with_noise_naive_ball))
+            ].sum()
+            apx_errors_naive_ball.append(
+                np.abs(dist_without_noise - dist_with_noise_naive_ball) / dist_without_noise
+            )
+
+            dist_with_noise_naive_ring = distances[
+                tuple(np.transpose(matching_array_with_noise_naive_ring))
+            ].sum()
+            apx_errors_naive_ring.append(
+                np.abs(dist_without_noise - dist_with_noise_naive_ring) / dist_without_noise
+            )
+
+            dist_with_noise_las_vegas_ring = distances[
+                tuple(np.transpose(matching_array_with_noise_las_vegas))
+            ].sum()
+            apx_errors_las_vegas_ring.append(
+                np.abs(dist_without_noise - dist_with_noise_las_vegas_ring) / dist_without_noise
+            )
+            # dist_with_noise_naive_random = distances[
+            #     tuple(np.transpose(matching_array_with_noise_naive_random))
+            # ].sum()
+            # apx_errors_naive_random.append(
+            #     np.abs(dist_without_noise - dist_with_noise_naive_random)
+            #     / dist_without_noise
+            # )
+
+            # dist_with_noise_auction = distances[
+            #     tuple(np.transpose(matching_array_with_noise_auction))
+            # ].sum()
+            # apx_errors_auction.append(
+            #     np.abs(dist_without_noise - dist_with_noise_auction) / dist_without_noise
+            # )
+
+        # apx_errors_avg.append(np.average(apx_errors))
+        # apx_errors_std.append(np.std(apx_errors))
+
+
+        apx_errors_avg_hungarian_ball.append(np.average(apx_errors_hungarian_ball))
+        apx_errors_std_hungarian_ball.append(np.std(apx_errors_hungarian_ball))
+
+
+        apx_errors_avg_naive_ball.append(np.average(apx_errors_naive_ball))
+        apx_errors_std_naive_ball.append(np.std(apx_errors_naive_ball))
+
+        apx_errors_avg_naive_ring.append(np.average(apx_errors_naive_ring))
+        apx_errors_std_naive_ring.append(np.std(apx_errors_naive_ring))
+
+        apx_errors_avg_las_vegas_ring.append(np.average(apx_errors_las_vegas_ring))
+        apx_errors_std_las_vegas_ring.append(np.std(apx_errors_las_vegas_ring))
+
+
+        # apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
+        # apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
+
+        # apx_errors_avg_auction.append(np.average(apx_errors_auction))
+        # apx_errors_std_auction.append(np.std(apx_errors_auction))
+
+    # plt.errorbar(
+    #     STD_SCALE / GRID[1],
+    #     apx_errors_avg,
+    #     yerr=apx_errors_std,
+    #     label="hungarian on noise",
+    # )
+    plt.errorbar(
+        RADIUS_SCALE / GRID[1],
+        apx_errors_avg_hungarian_ball,
+        yerr=apx_errors_std_hungarian_ball,
+        label="hungarian ball",
+    )
+
+    plt.errorbar(
+        RADIUS_SCALE / GRID[1],
+        apx_errors_avg_naive_ball,
+        yerr=apx_errors_std_naive_ball,
+        label="naive ball",
+    )
+
+    plt.errorbar(
+        RADIUS_SCALE / GRID[1],
+        apx_errors_avg_naive_ring,
+        yerr=apx_errors_std_naive_ring,
+        label="naive ring",
+    )
+
+    plt.errorbar(
+        RADIUS_SCALE / GRID[1],
+        apx_errors_avg_las_vegas_ring,
+        yerr=apx_errors_std_las_vegas_ring,
+        label="las vegas ring",
+    )
+
+    # plt.errorbar(
+    #     STD_SCALE / GRID[1],
+    #     apx_errors_avg_naive_random,
+    #     yerr=apx_errors_std_naive_random,
+    #     label="naive random on noise",
+    # )
+    # plt.errorbar(
+    #     STD_SCALE, apx_errors_avg_auction, yerr=apx_errors_std_auction, label="auction"
+    # )
+    plt.xlabel("Std of noise divided by grid length")
+    plt.ylabel("Approximation error of solution on noised problem")
+    plt.legend()
+    plt.title(
+        f"Approximation error of solution on noised problem - Noised Passengers\n N={N}, M={M}"
+    )
+    plt.grid()
+    if SAVE:
+        filename = (
+                "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
+        )
+        plt.savefig(filename)
+    plt.show()
+
 
 def main():
     np.random.seed(0)
@@ -287,18 +510,19 @@ def main():
             )
             distances = cdist(drivers, passengers)
 
-            noise = np.random.normal(0, std, M), np.random.uniform(0, np.pi, M)
+            noise = unif(0, std, M), np.random.uniform(0, np.pi, M)
             fake_passengers = passengers + polar_to_cartesian(*noise)
-            noise_matrix = np.random.normal(0, std, (N, M))
+
+            # noise_matrix = np.random.normal(0, std, (N, M))
             noise_distances = cdist(drivers, fake_passengers)
             # noise_distances = np.maximum(
-            #     GRID[1] / 100, cdist(drivers, passengers) + noise_matrix
+            #     GRID[1] / 1000, cdist(drivers, passengers) + noise_matrix
             # )
 
             matching_array_without_noise = get_matching_from_biadjecncy_matrix(
                 distances
             )
-            matching_array_without_noise_naive = naive_assignment(distances)
+            # matching_array_without_noise_naive = naive_assignment(distances)
 
             # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
             matching_array_with_noise = get_matching_from_biadjecncy_matrix(
@@ -308,7 +532,11 @@ def main():
             # matching_array_with_noise_naive_random = naive_assignment_random(
             #     noise_distances
             # )
-            matching_array_with_noise_naive_random = naive_las_vegas(noise_distances, K=3)
+
+
+            # matching_array_with_noise_naive_random = naive_las_vegas(noise_distances, K=3)
+
+
             # test = naive_las_vegas(distances)
 
             # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
@@ -333,13 +561,13 @@ def main():
                 np.abs(dist_without_noise - dist_with_noise_naive) / dist_without_noise
             )
 
-            dist_with_noise_naive_random = distances[
-                tuple(np.transpose(matching_array_with_noise_naive_random))
-            ].sum()
-            apx_errors_naive_random.append(
-                np.abs(dist_without_noise - dist_with_noise_naive_random)
-                / dist_without_noise
-            )
+            # dist_with_noise_naive_random = distances[
+            #     tuple(np.transpose(matching_array_with_noise_naive_random))
+            # ].sum()
+            # apx_errors_naive_random.append(
+            #     np.abs(dist_without_noise - dist_with_noise_naive_random)
+            #     / dist_without_noise
+            # )
 
             # dist_with_noise_auction = distances[
             #     tuple(np.transpose(matching_array_with_noise_auction))
@@ -354,8 +582,8 @@ def main():
         apx_errors_avg_naive.append(np.average(apx_errors_naive))
         apx_errors_std_naive.append(np.std(apx_errors_naive))
 
-        apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
-        apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
+        # apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
+        # apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
 
         # apx_errors_avg_auction.append(np.average(apx_errors_auction))
         # apx_errors_std_auction.append(np.std(apx_errors_auction))
@@ -373,12 +601,12 @@ def main():
         label="naive on noise",
     )
 
-    plt.errorbar(
-        STD_SCALE / GRID[1],
-        apx_errors_avg_naive_random,
-        yerr=apx_errors_std_naive_random,
-        label="naive random on noise",
-    )
+    # plt.errorbar(
+    #     STD_SCALE / GRID[1],
+    #     apx_errors_avg_naive_random,
+    #     yerr=apx_errors_std_naive_random,
+    #     label="naive random on noise",
+    # )
     # plt.errorbar(
     #     STD_SCALE, apx_errors_avg_auction, yerr=apx_errors_std_auction, label="auction"
     # )
@@ -398,5 +626,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    entropy_graph()
+    # calculate_min_distance()
+    # average_distance_calculation()
     # experiment_M_N()
