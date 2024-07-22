@@ -1296,7 +1296,7 @@ def relative_noise_distances_vs_uniform():
     plt.show()
 
 
-def time_domain_expansion_hungari():
+def time_domain_expansion_hungari(T=500):
     rad = 0.2 * GRID[1]
     drivers_timers = np.random.randint(0, N // 10, N)
     passengers_timers = np.zeros(M)
@@ -1306,7 +1306,7 @@ def time_domain_expansion_hungari():
     )
     all_noise = np.sqrt(np.random.uniform(0, rad ** 2, M)), np.random.uniform(0, 2 * np.pi, M)
     num_passengers_picked = 0
-    T = 500
+
     picked_per_iteration = np.zeros(T)
     for t in range(T):
         drivers_timers = np.maximum(0, drivers_timers - 1)
@@ -1340,10 +1340,11 @@ def time_domain_expansion_hungari():
     plt.ylabel('number of passengers picked')
     plt.title('Pickup in each iteration')
     plt.show()
-    return num_passengers_picked
+
+    return num_passengers_picked, picked_per_iteration
 
 
-def time_domain_expansion_greedy():
+def time_domain_expansion_greedy(T=500):
     rad = 0.2 * GRID[1]
     drivers_timers = np.random.randint(0, N // 10, N)
     passengers_timers = np.zeros(M)
@@ -1355,7 +1356,6 @@ def time_domain_expansion_greedy():
     all_relative_noise_factors = np.random.uniform(1 - relative_factor / 2, 1 + relative_factor / 2, (N, M))
 
     num_passengers_picked = 0
-    T = 500
     picked_per_iteration = np.zeros(T)
     for t in range(T):
         drivers_timers = np.maximum(0, drivers_timers - 1)
@@ -1389,8 +1389,21 @@ def time_domain_expansion_greedy():
     plt.ylabel('number of passengers picked')
     plt.show()
     plt.title('Pickup in each iteration')
-    return num_passengers_picked
+    return num_passengers_picked, picked_per_iteration
 
+
+
+def plot_time_domain_graphs(T=500):
+    num_picked_hungari, picked_per_iteration_hungari = time_domain_expansion_hungari(T)
+    num_picked_greedy, picked_per_iteration_greedy = time_domain_expansion_greedy(T)
+    plt.plot(np.arange(T), picked_per_iteration_hungari, label='centralized')
+    plt.plot(np.arange(T), picked_per_iteration_greedy, label='distributed')
+    plt.grid(True)
+    plt.xlabel('iteration')
+    plt.ylabel('number of passengers picked')
+    plt.legend()
+    plt.title('#Pickup in each iteration')
+    plt.show()
 
 
 
@@ -1547,6 +1560,5 @@ if __name__ == "__main__":
     # entropy_graph_empiric()
     # calculate_min_distance()
     # average_distance_calculation()
-    experiment_M_N()
-    # print(time_domain_expansion_hungari())
-    # print(time_domain_expansion_greedy())
+    # experiment_M_N()
+    plot_time_domain_graphs()
