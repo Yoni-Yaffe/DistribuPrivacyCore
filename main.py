@@ -10,12 +10,12 @@ from tqdm import tqdm
 from datetime import datetime
 
 SAVE = True
-N = 128  # Drivers
+N = 32  # Drivers
 M = int(N)    # Passengers
 GRID = 0, 1024
-EXPERIMENTS_NUM = 50
+EXPERIMENTS_NUM = 500
 STD_SCALE = np.linspace(0, GRID[1] / 10, num=10)
-RADIUS_SCALE = np.linspace(0, GRID[1] / 3, num=10)
+RADIUS_SCALE = np.linspace(0, GRID[1] / 5, num=10)
 MAX_ITER = 500
 
 def unif(loc: float = 0.0, scale: float = 1.0, size=None) -> float:
@@ -261,7 +261,7 @@ def experiment_M_N():
     apx_errors_std_naive = list()
     apx_errors_std_naive_random = list()
     apx_errors_std_auction = list()
-    M_factors = np.linspace(1, 5, 20)
+    M_factors = np.linspace(1, 5, 10)
     for factor in tqdm(M_factors):
         M = int(np.round(N * factor))
         apx_errors = list()
@@ -277,7 +277,7 @@ def experiment_M_N():
 
             matching_array_hungarian = get_matching_from_biadjecncy_matrix(distances)
             matching_array_naive = naive_assignment(distances)
-            matching_array_naive_random = naive_las_vegas(distances, MAX_K=3)
+            matching_array_naive_random = naive_las_vegas(distances, K=2)
 
             # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
             # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
@@ -556,9 +556,9 @@ def entropy_graph_empiric():
 
     plot_data = [
         {'values': apx_errors_avg_hungarian_ball, 'errors': apx_errors_std_hungarian_ball, 'label': "hungarian ball"},
-        {'values': apx_errors_avg_hungarian_ring, 'errors': apx_errors_std_hungarian_ring, 'label': "hungarian ring"},
-        {'values': apx_errors_avg_naive_ball, 'errors': apx_errors_std_naive_ball, 'label': "greedy ball"},
-        {'values': apx_errors_avg_naive_ring, 'errors': apx_errors_std_naive_ring, 'label': "greedy ring"},
+        # {'values': apx_errors_avg_hungarian_ring, 'errors': apx_errors_std_hungarian_ring, 'label': "hungarian ring"},
+        # {'values': apx_errors_avg_naive_ball, 'errors': apx_errors_std_naive_ball, 'label': "greedy ball"},
+        # {'values': apx_errors_avg_naive_ring, 'errors': apx_errors_std_naive_ring, 'label': "greedy ring"},
         {'values': apx_errors_avg_las_vegas_ring, 'errors': apx_errors_std_las_vegas_ring, 'label': "las vegas ring"}
     ]
 
@@ -1407,7 +1407,93 @@ def plot_time_domain_graphs(T=500):
 
 
 
+def experiment_las_vegas_and_greedy_errors():
+    np.random.seed(0)
+    apx_errors_avg = list()
+    apx_errors_std = list()
+    apx_errors_avg_naive = list()
+    apx_errors_avg_naive_random = list()
+    apx_errors_avg_auction = list()
+    apx_errors_std_naive = list()
+    apx_errors_std_naive_random = list()
+    apx_errors_std_auction = list()
+    N_list = np.arange(32, 256, 16)
+    for n in tqdm(N_list):
+        N = M = n
+        apx_errors = list()
+        apx_errors_without_noise = list()
+        apx_errors_naive = list()
+        apx_errors_naive_random = list()
+        apx_errors_auction = list()
+        for experiment in range(EXPERIMENTS_NUM):
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
+            distances = cdist(drivers, passengers)
 
+            matching_array_hungarian = get_matching_from_biadjecncy_matrix(distances)
+            matching_array_naive = naive_assignment(distances)
+
+            matching_array_naive_random = naive_las_vegas(distances, K=3)
+
+            # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
+            # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
+            # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
+            # exit(1)
+
+            dist_hungarian = distances[
+                tuple(np.transpose(matching_array_hungarian))
+            ].sum()
+
+            dist_naive = distances[tuple(np.transpose(matching_array_naive))].sum()
+            apx_errors_naive.append(
+                np.abs(dist_hungarian - dist_naive) / dist_hungarian
+            )
+
+            dist_naive_random = distances[
+                tuple(np.transpose(matching_array_naive_random))
+            ].sum()
+            apx_errors_naive_random.append(
+                np.abs(dist_hungarian - dist_naive_random) / dist_hungarian
+            )
+
+        # apx_errors_avg.append(np.average(apx_errors))
+        # apx_errors_std.append(np.std(apx_errors))
+
+        apx_errors_avg_naive.append(np.average(apx_errors_naive))
+        apx_errors_std_naive.append(np.std(apx_errors_naive))
+
+        apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
+        apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
+
+        # apx_errors_avg_auction.append(np.average(apx_errors_auction))
+        # apx_errors_std_auction.append(np.std(apx_errors_auction))
+
+    # plt.errorbar(
+    #     STD_SCALE / GRID[1], apx_errors_avg, yerr=apx_errors_std, label="hungarian on noise"
+    # )
+    plt.errorbar(
+        N_list, apx_errors_avg_naive, yerr=apx_errors_std_naive, label="greedy"
+    )
+
+    plt.errorbar(
+        N_list, apx_errors_avg_naive_random, yerr=apx_errors_std_naive_random,
+        label="las vegas"
+    )
+    # plt.errorbar(
+    #     STD_SCALE, apx_errors_avg_auction, yerr=apx_errors_std_auction, label="auction"
+    # )
+    plt.xlabel("#Drivers")
+    plt.ylabel("Approximation error of solution\ncompared to hungarian")
+    plt.title(f"Approximation error of Greedy and Las Vegas\nas a function of #Drivers when #Drivers=#Passengers")
+    plt.grid()
+    plt.legend()
+    if SAVE:
+        filename = (
+            "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
+        )
+        plt.savefig(filename)
+    plt.show()
 
 def main():
     np.random.seed(0)
@@ -1560,5 +1646,6 @@ if __name__ == "__main__":
     # entropy_graph_empiric()
     # calculate_min_distance()
     # average_distance_calculation()
-    # experiment_M_N()
-    plot_time_domain_graphs()
+    experiment_M_N()
+    # plot_time_domain_graphs()
+    # experiment_las_vegas_and_greedy_errors()
