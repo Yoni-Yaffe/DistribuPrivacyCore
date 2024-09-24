@@ -5,9 +5,10 @@ import auct
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# import dlib
 from tqdm import tqdm
 from datetime import datetime
+import time
+
 
 SAVE = True
 N = 256  # Drivers
@@ -1527,6 +1528,44 @@ def las_vegas_vs_greedy_noise():
         plt.savefig(filename)
     plt.show()
 
+def runtime_test_experiment(num_of_trials=10):
+    N_values = np.arange(100, 1100, 100)
+
+    for n in N_values:
+        print(f"\nN = {n}\n")
+        times_hungary = []
+        times_greedy = []
+        times_las_vegas = []
+        for _ in range(num_of_trials):
+            drivers, passengers = np.random.uniform(*GRID, (n, 2)), np.random.uniform(
+                *GRID, (n, 2)
+            )
+            distances = cdist(drivers, passengers)
+
+            start_time = time.time()
+            get_matching_from_biadjecncy_matrix(distances)
+            elapsed_time_hungary = time.time() - start_time
+
+            start_time = time.time()
+            greedy_assignment(distances)
+            elapsed_time_greedy = time.time() - start_time
+
+            start_time = time.time()
+            naive_las_vegas(distances, K=3)
+            elapsed_time_las_vegas = time.time() - start_time
+
+            times_hungary.append(elapsed_time_hungary)
+            times_greedy.append(elapsed_time_greedy)
+            times_las_vegas.append(elapsed_time_las_vegas)
+        # print(times_hungary)
+        print(f"  Hungary: {np.mean(times_hungary)*1000:.2f} ms")
+        print(f"  Greedy: {np.mean(times_greedy)*1000:.2f} ms")
+        print(f"  Las Vegas: {np.mean(times_las_vegas)*1000:.2f} ms")
+
+
+
+
+
 if __name__ == "__main__":
     # np.random.seed(2)
     # visualize_matching_full(n=7)
@@ -1535,10 +1574,11 @@ if __name__ == "__main__":
     # plot_distance_density(100, 50000, )
     # relative_noise_distances_vs_uniform()
     # entropy_graph()
-    entropy_graph_empiric()
+    # entropy_graph_empiric()
     # calculate_min_distance()
     # average_distance_calculation()
     # experiment_M_N()
     # plot_time_domain_graphs()
     # las_vegas_vs_greedy_noise()
     # experiment_las_vegas_and_greedy_errors()
+    runtime_test_experiment(10)
