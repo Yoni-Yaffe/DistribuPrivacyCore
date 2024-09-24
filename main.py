@@ -10,12 +10,12 @@ from tqdm import tqdm
 from datetime import datetime
 
 SAVE = True
-N = 32  # Drivers
+N = 256  # Drivers
 M = int(N)    # Passengers
 GRID = 0, 1024
 EXPERIMENTS_NUM = 500
 STD_SCALE = np.linspace(0, GRID[1] / 10, num=10)
-RADIUS_SCALE = np.linspace(0, GRID[1] / 5, num=10)
+RADIUS_SCALE = np.linspace(0, GRID[1] / 5 , num=10)
 MAX_ITER = 500
 
 def unif(loc: float = 0.0, scale: float = 1.0, size=None) -> float:
@@ -42,25 +42,13 @@ def plot_distance_density(n=1000, m=1000, factor=0.4):
             0, 1, (m , 2)
         )
 
-        # noise = np.sqrt(np.random.uniform(0, 1, m)), np.random.uniform(0, 2 * np.pi, m)
-        # drivers = polar_to_cartesian(*noise)
-
-        # noise = np.sqrt(np.random.uniform(0, 1, m)), np.random.uniform(0, 2 * np.pi, m)
-        # passengers = polar_to_cartesian(*noise)
         distances = cdist(drivers, passengers)
         noise = np.random.uniform(1-factor, 1+factor, (n, m))
         noised_distances = distances * noise
         # sns.kdeplot(data=distances.flatten())
         # sns.kdeplot(distances.flatten(), fill=True)
         sns.kdeplot(noised_distances.flatten(), fill=True, label=f'factor={factor}')
-        # x = np.linspace(0, 1.05, 100)
-        # y = - 5.2 * x * (x - 1.05)
-        # plt.plot(x, y)
 
-        # plt.hist(distances.flatten(), density=True, bins = 500)
-        # plt.hist(noised_distances.flatten(), density=True, bins = 500)
-        # plt.hist(())
-        # plt.show()
     plt.title('PDF of distance for different factors')
     plt.xlabel('distance')
     plt.ylabel('Density')
@@ -70,7 +58,7 @@ def plot_distance_density(n=1000, m=1000, factor=0.4):
     plt.show()
 
 
-def naive_assignment(biadjecancy_matrix: np.array, minimize=True):
+def greedy_assignment(biadjecancy_matrix: np.array, minimize=True):
     switch_assign = False
     if biadjecancy_matrix.shape[0] > biadjecancy_matrix.shape[1]:
         biadjecancy_matrix = biadjecancy_matrix.transpose()
@@ -101,7 +89,7 @@ def naive_assignment(biadjecancy_matrix: np.array, minimize=True):
     return np.array(list(enumerate(assignments)))
 
 
-def naive_assignment_random(biadjecancy_matrix: np.array, minimize=True):
+def greedy_assignment_random(biadjecancy_matrix: np.array, minimize=True):
     K = 3
     switch_assign = False
     if biadjecancy_matrix.shape[0] > biadjecancy_matrix.shape[1]:
@@ -261,7 +249,7 @@ def experiment_M_N():
     apx_errors_std_naive = list()
     apx_errors_std_naive_random = list()
     apx_errors_std_auction = list()
-    M_factors = np.linspace(1, 5, 10)
+    M_factors = np.linspace(1, 2, 10)
     for factor in tqdm(M_factors):
         M = int(np.round(N * factor))
         apx_errors = list()
@@ -276,13 +264,8 @@ def experiment_M_N():
             distances = cdist(drivers, passengers)
 
             matching_array_hungarian = get_matching_from_biadjecncy_matrix(distances)
-            matching_array_naive = naive_assignment(distances)
-            matching_array_naive_random = naive_las_vegas(distances, K=2)
-
-            # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
-            # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
-            # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
-            # exit(1)
+            matching_array_naive = greedy_assignment(distances)
+            matching_array_naive_random = naive_las_vegas(distances, K=3)
 
             dist_hungarian = distances[
                 tuple(np.transpose(matching_array_hungarian))
@@ -300,21 +283,12 @@ def experiment_M_N():
                 np.abs(dist_hungarian - dist_naive_random) / dist_hungarian
             )
 
-        # apx_errors_avg.append(np.average(apx_errors))
-        # apx_errors_std.append(np.std(apx_errors))
-
         apx_errors_avg_naive.append(np.average(apx_errors_naive))
         apx_errors_std_naive.append(np.std(apx_errors_naive))
 
         apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
         apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
 
-        # apx_errors_avg_auction.append(np.average(apx_errors_auction))
-        # apx_errors_std_auction.append(np.std(apx_errors_auction))
-
-    # plt.errorbar(
-    #     STD_SCALE / GRID[1], apx_errors_avg, yerr=apx_errors_std, label="hungarian on noise"
-    # )
     plt.errorbar(
         M_factors, apx_errors_avg_naive, yerr=apx_errors_std_naive, label="greedy"
     )
@@ -323,9 +297,6 @@ def experiment_M_N():
         M_factors, apx_errors_avg_naive_random, yerr=apx_errors_std_naive_random,
         label="las vegas"
     )
-    # plt.errorbar(
-    #     STD_SCALE, apx_errors_avg_auction, yerr=apx_errors_std_auction, label="auction"
-    # )
     plt.xlabel("#Passengers/#Drivers")
     plt.ylabel("Approximation error of solution\ncompared to hungarian")
     plt.title(f"Approximation error of Greedy solution\nas a function of #Passengers/#Drivers")
@@ -402,11 +373,6 @@ def entropy_graph_empiric():
 
     distance_rad_list = []
     for rad in tqdm(RADIUS_SCALE):
-        # std_distance = std ** 2 * (12 ** 0.5) / entropy_d
-        # rad_distances = rad * 4
-        rad_distances = rad ** 2 / GRID[1]
-        relative_factor = 2 * rad ** 2 / GRID[1] ** 2
-        # rad_distances = rad / 2000
         apx_errors_naive_ball = list()
         apx_errors_naive_ring = list()
         apx_errors_las_vegas_ring = list()
@@ -424,7 +390,6 @@ def entropy_graph_empiric():
             noise = np.sqrt(np.random.uniform(0, rad ** 2, M)), np.random.uniform(0, 2 * np.pi, M)
             fake_passengers = passengers + polar_to_cartesian(*noise)
 
-            # noise_matrix = unif(0, std_distance, (N, M))
             noise_matrix = np.random.uniform(-rad_distances / 2, rad_distances / 2, (N, M))
             # relative_noise_matrix = np.random.uniform(1 - relative_factor / 2, 1 + relative_factor / 2, (N, M))
 
@@ -444,26 +409,13 @@ def entropy_graph_empiric():
             matching_array_with_noise_ring = get_matching_from_biadjecncy_matrix(
                 noise_distances_ring
             )
-            # matching_array_without_noise_naive = naive_assignment(distances)
 
-            # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
-            # matching_array_with_noise = get_matching_from_biadjecncy_matrix(
-            #     noise_distances
-            # )
-            matching_array_with_noise_naive_ball = naive_assignment(noise_distances_ball)
-            matching_array_with_noise_naive_ring = naive_assignment(noise_distances_ring)
+            matching_array_with_noise_naive_ball = greedy_assignment(noise_distances_ball)
+            matching_array_with_noise_naive_ring = greedy_assignment(noise_distances_ring)
 
-            # matching_array_with_noise_naive_random = naive_assignment_random(
-            #     noise_distances
-            # )
 
             matching_array_with_noise_las_vegas = naive_las_vegas(noise_distances_ring, K=3)
 
-            # test = naive_las_vegas(distances)
-
-            # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
-            # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
-            # exit(1)
 
             dist_without_noise = distances[
                 tuple(np.transpose(matching_array_without_noise))
@@ -482,13 +434,6 @@ def entropy_graph_empiric():
             apx_errors_hungarian_ring.append(
                 np.abs(dist_without_noise - dist_with_noise_hungarian_ring) / dist_without_noise
             )
-            # apx_errors_without_noise.append(dist_without_noise)
-            # dist_with_noise = distances[
-            #     tuple(np.transpose(matching_array_with_noise))
-            # ].sum()
-            # apx_errors.append(
-            #     np.abs(dist_without_noise - dist_with_noise) / dist_without_noise
-            # )
 
             dist_with_noise_naive_ball = distances[
                 tuple(np.transpose(matching_array_with_noise_naive_ball))
@@ -511,24 +456,6 @@ def entropy_graph_empiric():
                 np.abs(dist_without_noise - dist_with_noise_las_vegas_ring) / dist_without_noise
             )
 
-                        # dist_with_noise_naive_random = distances[
-            #     tuple(np.transpose(matching_array_with_noise_naive_random))
-            # ].sum()
-            # apx_errors_naive_random.append(
-            #     np.abs(dist_without_noise - dist_with_noise_naive_random)
-            #     / dist_without_noise
-            # )
-
-            # dist_with_noise_auction = distances[
-            #     tuple(np.transpose(matching_array_with_noise_auction))
-            # ].sum()
-            # apx_errors_auction.append(
-            #     np.abs(dist_without_noise - dist_with_noise_auction) / dist_without_noise
-            # )
-
-        # apx_errors_avg.append(np.average(apx_errors))
-        # apx_errors_std.append(np.std(apx_errors))
-
 
         apx_errors_avg_hungarian_ball.append(np.average(apx_errors_hungarian_ball))
         apx_errors_std_hungarian_ball.append(np.std(apx_errors_hungarian_ball))
@@ -547,12 +474,6 @@ def entropy_graph_empiric():
         apx_errors_std_las_vegas_ring.append(np.std(apx_errors_las_vegas_ring))
 
         distance_rad_list.append(np.mean(curr_distance_rad))
-
-        # apx_errors_avg_naive_random.append(np.average(apx_errors_naive_random))
-        # apx_errors_std_naive_random.append(np.std(apx_errors_naive_random))
-
-        # apx_errors_avg_auction.append(np.average(apx_errors_auction))
-        # apx_errors_std_auction.append(np.std(apx_errors_auction))
 
     plot_data = [
         {'values': apx_errors_avg_hungarian_ball, 'errors': apx_errors_std_hungarian_ball, 'label': "hungarian ball"},
@@ -573,29 +494,29 @@ def entropy_graph_empiric():
     plt.ylabel("Approximation error compared to\noptimal solution without noise")
     plt.legend()
     plt.title(
-        f"Approximation error as a function of entropy \n Distance Relative Noise N={N}, M={M}"
+        f"Approximation error as a function of entropy \nN={N}, M={M}"
     )
 
     # Here we add the second x-axis
     ax1 = plt.gca()  # Get the current axes instance
     ax1.set_xlim(RADIUS_SCALE[0] / GRID[1], RADIUS_SCALE[-1] / GRID[1])
     ax1.set_xticks(RADIUS_SCALE / GRID[1])
-    ax1.set_xticklabels(["{:.2f}".format(t) for t in RADIUS_SCALE / GRID[1]])
-    ax1.set_xlabel('noise length')
+    ax1.set_xticklabels(["{:.2f}".format(t * 100) for t in RADIUS_SCALE / GRID[1]])
+    ax1.set_xlabel('ball noise as a percentage of grid size')
     ax2 = ax1.twiny()  # Create a new set of axes (twin) that shares the same y-axis
 
     new_tick_locations = np.array(distance_rad_list) / GRID[1]
     ax2.set_xlim(new_tick_locations[0], new_tick_locations[-1])
     ax2.set_xticks(RADIUS_SCALE / GRID[1])
-    ax2.set_xticklabels(["{:.2f}".format(t) for t in new_tick_locations])
-    ax2.set_xlabel('distance noise length')
+    ax2.set_xticklabels(["{:.2f}".format(t * 100) for t in new_tick_locations])
+    ax2.set_xlabel('distance (ring) noise length as a percentage of grid size')
 
     plt.tight_layout()
 
     plt.grid()
     if SAVE:
         filename = (
-                "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
+                "plots/plot" + datetime.today().strftime("%Y_%m_%d__%H_%M_%S") + ".png"
         )
         plt.savefig(filename)
     plt.show()
@@ -645,9 +566,7 @@ def entropy_graph():
             relative_noise_matrix = np.random.uniform(1 - relative_factor / 2, 1 + relative_factor / 2, (N, M))
 
             noise_distances_ball = cdist(drivers, fake_passengers)
-            # noise_distances_ring = np.maximum(
-            #     GRID[1] / 10000, distances + noise_matrix
-            # )
+
             noise_distances_ring = distances * relative_noise_matrix
 
             matching_array_without_noise = get_matching_from_biadjecncy_matrix(
@@ -660,26 +579,12 @@ def entropy_graph():
             matching_array_with_noise_ring = get_matching_from_biadjecncy_matrix(
                 noise_distances_ring
             )
-            # matching_array_without_noise_naive = naive_assignment(distances)
+            matching_array_with_noise_naive_ball = greedy_assignment(noise_distances_ball)
+            matching_array_with_noise_naive_ring = greedy_assignment(noise_distances_ring)
 
-            # matching_array_with_noise_auction = auct.auction_assignment(noise_distances)
-            # matching_array_with_noise = get_matching_from_biadjecncy_matrix(
-            #     noise_distances
-            # )
-            matching_array_with_noise_naive_ball = naive_assignment(noise_distances_ball)
-            matching_array_with_noise_naive_ring = naive_assignment(noise_distances_ring)
-
-            # matching_array_with_noise_naive_random = naive_assignment_random(
-            #     noise_distances
-            # )
 
             matching_array_with_noise_las_vegas = naive_las_vegas(noise_distances_ring, K=3)
 
-            # test = naive_las_vegas(distances)
-
-            # visualize_matching(passengers, drivers, matching_array_without_noise, title='hungarian')
-            # visualize_matching(passengers, drivers, matching_array_without_noise_naive, title='naive')
-            # exit(1)
 
             dist_without_noise = distances[
                 tuple(np.transpose(matching_array_without_noise))
@@ -815,116 +720,6 @@ def entropy_graph():
     plt.show()
 
 
-# def entropy_graph_test():
-#     np.random.seed(1)
-#     error_metrics = {
-#         'hungarian_ball': {'avg': [], 'std': []},
-#         'hungarian_ring': {'avg': [], 'std': []},
-#         'naive_ball': {'avg': [], 'std': []},
-#         'naive_ring': {'avg': [], 'std': []},
-#         'las_vegas_ring': {'avg': [], 'std': []}
-#     }
-#
-#     distance_rad_list = []
-#     for rad in tqdm(RADIUS_SCALE):
-#         rad_errors = {key: [] for key in error_metrics}  # Temporary storage for each rad
-#         rad_distances = rad ** 2 / GRID[1]  # Example calculation for rad_distances
-#         curr_distance_rad = []
-#
-#         for experiment in range(EXPERIMENTS_NUM):
-#             # Experiment setup and distance calculation would go here
-#             drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
-#                 *GRID, (M, 2)
-#             )
-#             distances = cdist(drivers, passengers)
-#
-#             noise_ball = np.sqrt(np.random.uniform(0, rad ** 2, M)), np.random.uniform(0, 2 * np.pi, M)
-#             fake_passengers = passengers + polar_to_cartesian(*noise_ball)
-#
-#             # noise_matrix = unif(0, std_distance, (N, M))
-#             noise_matrix = np.random.uniform(-rad_distances / 2, rad_distances / 2, (N, M))
-#             relative_noise_matrix = np.random.uniform(1 - relative_factor / 2, 1 + relative_factor / 2, (N, M))
-#
-#             noise_distances_ball = cdist(drivers, fake_passengers)
-#             # noise_distances_ring = np.maximum(
-#             #     GRID[1] / 10000, distances + noise_matrix
-#             # )
-#             noise_distances_ring = distances * relative_noise_matrix
-#
-#             # Simulation of matching and error calculation for each method
-#
-#             matching_array_without_noise = get_matching_from_biadjecncy_matrix(
-#                 distances
-#             )
-#             dist_without_noise = distances[
-#                 tuple(np.transpose(matching_array_without_noise))
-#             ].sum()
-#
-#             for method in rad_errors:
-#                 # Perform the matching for this method, which you would define in your actual code
-#                 # matching_array = perform_matching(method, ...)
-#                 # Calculate the approximation error for the matching
-#                 dist_matching = distances[tuple(np.transpose(matching_array))].sum()
-#                 error = np.abs(dist_without_noise - dist_matching) / dist_without_noise
-#                 rad_errors[method].append(error)
-#
-#             # Example for calculation of rad_distances based on the experiment
-#             curr_distance_rad.append(rad_distances)
-#
-#         # Calculate the average and standard deviation for each method and radius
-#         for method, values in error_metrics.items():
-#             values['avg'].append(np.mean(rad_errors[method]))
-#             values['std'].append(np.std(rad_errors[method]))
-#
-#         # Keep track of the average rad_distances
-#         distance_rad_list.append(np.mean(curr_distance_rad))
-#
-#     plot_data = [
-#         {'values': apx_errors_avg_hungarian_ball, 'errors': apx_errors_std_hungarian_ball, 'label': "hungarian ball"},
-#         {'values': apx_errors_avg_hungarian_ring, 'errors': apx_errors_std_hungarian_ring, 'label': "hungarian ring"},
-#         {'values': apx_errors_avg_naive_ball, 'errors': apx_errors_std_naive_ball, 'label': "naive ball"},
-#         {'values': apx_errors_avg_naive_ring, 'errors': apx_errors_std_naive_ring, 'label': "naive ring"},
-#         {'values': apx_errors_avg_las_vegas_ring, 'errors': apx_errors_std_las_vegas_ring, 'label': "las vegas ring"}
-#     ]
-#
-#     # Loop through each entry and plot the error bars
-#     for data in plot_data:
-#         plt.errorbar(
-#             RADIUS_SCALE / GRID[1],
-#             data['values'],
-#             yerr=data['errors'],
-#             label=data['label']
-#         )
-#     plt.ylabel("Approximation error compared to optimal solution without nosie")
-#     plt.legend()
-#     plt.title(
-#         f"Approximation error as a function of entropy \n Distance Relative Noise N={N}, M={M}"
-#     )
-#
-#     # Here we add the second x-axis
-#     ax1 = plt.gca()  # Get the current axes instance
-#     ax1.set_xlim(RADIUS_SCALE[0] / GRID[1], RADIUS_SCALE[-1] / GRID[1])
-#     ax1.set_xticks(RADIUS_SCALE / GRID[1])
-#     ax1.set_xticklabels(["{:.2f}".format(t) for t in RADIUS_SCALE / GRID[1]])
-#     ax1.set_xlabel('noise ball radius')
-#     ax2 = ax1.twiny()  # Create a new set of axes (twin) that shares the same y-axis
-#
-#     new_tick_locations = np.array(distance_rad_list) / GRID[1]
-#     ax2.set_xlim(new_tick_locations[0], new_tick_locations[-1])
-#     ax2.set_xticks(RADIUS_SCALE / GRID[1])
-#     ax2.set_xticklabels(["{:.2f}".format(t) for t in new_tick_locations])
-#     ax2.set_xlabel('distance noise length')
-#
-#     plt.tight_layout()
-#
-#     plt.grid()
-#     if SAVE:
-#         filename = (
-#                 "plots/plot" + datetime.today().strftime("%Y_%m_%d_%H_%M_%S") + ".png"
-#         )
-#         plt.savefig(filename)
-#     plt.show()
-
 def relative_noise_distances():
     np.random.seed(0)
     apx_errors_avg = list()
@@ -968,7 +763,7 @@ def relative_noise_distances():
             matching_array_with_noise = get_matching_from_biadjecncy_matrix(
                 noise_distances
             )
-            matching_array_with_noise_naive = naive_assignment(noise_distances)
+            matching_array_with_noise_naive = greedy_assignment(noise_distances)
             # matching_array_with_noise_naive_random = naive_assignment_random(
             #     noise_distances
             # )
@@ -1131,8 +926,8 @@ def relative_noise_distances_vs_uniform():
             matching_array_with_relative_noise = get_matching_from_biadjecncy_matrix(
                 noise_distances_relative
             )
-            matching_array_with_uniform_noise_naive = naive_assignment(noise_distances_uniform)
-            matching_array_with_relative_noise_naive = naive_assignment(noise_distances_relative)
+            matching_array_with_uniform_noise_naive = greedy_assignment(noise_distances_uniform)
+            matching_array_with_relative_noise_naive = greedy_assignment(noise_distances_relative)
 
             # matching_array_with_noise_naive_random = naive_assignment_random(
             #     noise_distances
@@ -1370,7 +1165,7 @@ def time_domain_expansion_greedy(T=500):
         distances = cdist(drivers, passengers)
         relative__noise_factors = all_relative_noise_factors[open_drivers][:, open_passengers]
         noise_distances_ring = distances * relative__noise_factors
-        matching_array_with_noise = naive_assignment(noise_distances_ring)
+        matching_array_with_noise = greedy_assignment(noise_distances_ring)
         # matching_array_with_noise = naive_las_vegas_modified(noise_distances_ring, MAX_K=3)
         num_passengers_picked += matching_array_with_noise.shape[0]
         picked_per_iteration[t] += matching_array_with_noise.shape[0]
@@ -1432,7 +1227,7 @@ def experiment_las_vegas_and_greedy_errors():
             distances = cdist(drivers, passengers)
 
             matching_array_hungarian = get_matching_from_biadjecncy_matrix(distances)
-            matching_array_naive = naive_assignment(distances)
+            matching_array_naive = greedy_assignment(distances)
 
             matching_array_naive_random = naive_las_vegas(distances, K=3)
 
@@ -1538,7 +1333,7 @@ def main():
             matching_array_with_noise = get_matching_from_biadjecncy_matrix(
                 noise_distances
             )
-            matching_array_with_noise_naive = naive_assignment(noise_distances)
+            matching_array_with_noise_naive = greedy_assignment(noise_distances)
             # matching_array_with_noise_naive_random = naive_assignment_random(
             #     noise_distances
             # )
@@ -1634,6 +1429,103 @@ def main():
         plt.savefig(filename)
     plt.show()
 
+def las_vegas_vs_greedy_noise():
+    np.random.seed(1)
+
+    apx_errors_avg_naive_ring = list()
+    apx_errors_std_naive_ring = list()
+
+    apx_errors_avg_las_vegas_ring = list()
+    apx_errors_std_las_vegas_ring = list()
+    for rad in tqdm(RADIUS_SCALE):
+        apx_errors_naive_ring = list()
+        apx_errors_las_vegas_ring = list()
+        for experiment in range(EXPERIMENTS_NUM):
+            drivers, passengers = np.random.uniform(*GRID, (N, 2)), np.random.uniform(
+                *GRID, (M, 2)
+            )
+            distances = cdist(drivers, passengers)
+            noise_matrix = np.random.uniform(-rad / 2, rad / 2, (N, M))
+            noise_distances_ring = np.maximum(
+                GRID[1] / 10000, distances + noise_matrix
+            )
+
+            matching_array_without_noise = get_matching_from_biadjecncy_matrix(
+                distances
+            )
+
+            matching_array_with_noise_ring = get_matching_from_biadjecncy_matrix(
+                noise_distances_ring
+            )
+            matching_array_with_noise_naive_ring = greedy_assignment(noise_distances_ring)
+
+            matching_array_with_noise_las_vegas = naive_las_vegas(noise_distances_ring, K=3)
+
+            dist_without_noise = distances[
+                tuple(np.transpose(matching_array_without_noise))
+            ].sum()
+
+
+            dist_with_noise_naive_ring = distances[
+                tuple(np.transpose(matching_array_with_noise_naive_ring))
+            ].sum()
+            apx_errors_naive_ring.append(
+                np.abs(dist_without_noise - dist_with_noise_naive_ring) / dist_without_noise
+            )
+
+            dist_with_noise_las_vegas_ring = distances[
+                tuple(np.transpose(matching_array_with_noise_las_vegas))
+            ].sum()
+            apx_errors_las_vegas_ring.append(
+                np.abs(dist_without_noise - dist_with_noise_las_vegas_ring) / dist_without_noise
+            )
+
+        apx_errors_avg_naive_ring.append(np.average(apx_errors_naive_ring))
+        apx_errors_std_naive_ring.append(np.std(apx_errors_naive_ring))
+
+        apx_errors_avg_las_vegas_ring.append(np.average(apx_errors_las_vegas_ring))
+        apx_errors_std_las_vegas_ring.append(np.std(apx_errors_las_vegas_ring))
+
+
+
+    plot_data = [
+        # {'values': apx_errors_avg_hungarian_ball, 'errors': apx_errors_std_hungarian_ball, 'label': "hungarian ball"},
+        # {'values': apx_errors_avg_hungarian_ring, 'errors': apx_errors_std_hungarian_ring, 'label': "hungarian ring"},
+        # {'values': apx_errors_avg_naive_ball, 'errors': apx_errors_std_naive_ball, 'label': "greedy ball"},
+        {'values': apx_errors_avg_naive_ring, 'errors': apx_errors_std_naive_ring, 'label': "greedy"},
+        {'values': apx_errors_avg_las_vegas_ring, 'errors': apx_errors_std_las_vegas_ring, 'label': "las vegas"}
+    ]
+
+    # Loop through each entry and plot the error bars
+    for data in plot_data:
+        plt.errorbar(
+            RADIUS_SCALE / GRID[1],
+            data['values'],
+            yerr=data['errors'],
+            label=data['label']
+        )
+    plt.ylabel("Approximation error compared to\noptimal solution without noise")
+    plt.legend()
+    plt.title(
+        f"Approximation error as a function of noise \nN={N}, M={M}"
+    )
+
+    # Here we add the second x-axis
+    ax1 = plt.gca()  # Get the current axes instance
+    ax1.set_xlim(RADIUS_SCALE[0] / GRID[1], RADIUS_SCALE[-1] / GRID[1])
+    ax1.set_xticks(RADIUS_SCALE / GRID[1])
+    ax1.set_xticklabels(["{:.2f}".format(t * 100) for t in RADIUS_SCALE / GRID[1]])
+    ax1.set_xlabel('distance noise as a percentage of grid size')
+
+    plt.tight_layout()
+
+    plt.grid()
+    if SAVE:
+        filename = (
+                "plots/plot" + datetime.today().strftime("%Y_%m_%d__%H_%M_%S") + ".png"
+        )
+        plt.savefig(filename)
+    plt.show()
 
 if __name__ == "__main__":
     # np.random.seed(2)
@@ -1643,9 +1535,10 @@ if __name__ == "__main__":
     # plot_distance_density(100, 50000, )
     # relative_noise_distances_vs_uniform()
     # entropy_graph()
-    # entropy_graph_empiric()
+    entropy_graph_empiric()
     # calculate_min_distance()
     # average_distance_calculation()
-    experiment_M_N()
+    # experiment_M_N()
     # plot_time_domain_graphs()
+    # las_vegas_vs_greedy_noise()
     # experiment_las_vegas_and_greedy_errors()
