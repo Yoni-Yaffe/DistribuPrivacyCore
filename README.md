@@ -1,6 +1,6 @@
 # DistribuPrivacyCore
 
-DistribuPrivacyCore is a Python-based project designed for [Brief Project Description]. This project was tested and run using **Python 3.10**. Please ensure that all required dependencies are installed (listed in `requirements.txt`).
+DistribuPrivacyCore is a Python-based project designed for simulating ride-sharing problem using different privacy constraints. This project was tested and run using **Python 3.10**. Please ensure that all required dependencies are installed (listed in `requirements.txt`).
 
 ## Table of Contents
 
